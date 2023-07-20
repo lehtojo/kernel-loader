@@ -1,0 +1,6 @@
+*.o
+*.EFI
+*.obj
+*.SO
+*.a
+*img
