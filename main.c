@@ -24,6 +24,13 @@ struct LoadInformation {
 	uint64_t entry_point;
 };
 
+struct GraphicsInformation {
+	uint64_t framebuffer_physical_address;
+	int64_t horizontal_stride;
+	int64_t width;
+	int64_t height;
+};
+
 struct UefiData {
 	efi_system_table_t* system_table;
 	struct Segment* regions;
@@ -34,6 +41,7 @@ struct UefiData {
 	uint64_t bitmap_font_file_size;
 	uint8_t* bitmap_font_descriptor_file;
 	uint64_t bitmap_font_descriptor_file_size;
+	struct GraphicsInformation graphics_information;
 };
 
 extern int64_t _V4loadPhPP7SegmentyP15LoadInformation_ry(uint8_t* data, struct Segment* available_regions, uint64_t available_region_count, struct LoadInformation* load_information);
@@ -158,7 +166,7 @@ void add_memory_info(struct UefiData* data, struct MemoryMap* map) {
 	printf("Memory map end: %d MiB\n", data->memory_map_end / (0x100000));
 }
 
-void configure_gop() {
+void configure_gop(struct GraphicsInformation* information) {
 	// Locate GOP so that we can find a suitable video mode
 	efi_guid_t gop_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
 	efi_gop_t* gop = 0;
@@ -192,7 +200,7 @@ void configure_gop() {
 	printf("Available video modes:\n");
 
 	int best_mode = -1;
-	int64_t best_mode_area = -1; 
+	int64_t best_mode_area = -1;
 
 	for (int i = 0; i < mode_count; i++) {
 		// Load information about the current mode
@@ -203,16 +211,19 @@ void configure_gop() {
 			continue;
 		}
 
+		int64_t width = mode_info->HorizontalResolution;
+		int64_t height = mode_info->VerticalResolution;
+
 		printf("Mode %d: width=%d, height=%d, format=%x %s\n",
 			i,
-			mode_info->HorizontalResolution,
-			mode_info->VerticalResolution,
+			width,
+			height,
 			mode_info->PixelFormat,
 			i == current_mode ? "(current)" : ""
 		);
 
 		// Calculate the area of the current mode
-		int64_t area = (int64_t)mode_info->HorizontalResolution * (int64_t)mode_info->VerticalResolution;
+		int64_t area = width * height;
 
 		// If this mode has a larger area than the previous best, use it instead
 		if (area > best_mode_area) {
@@ -239,13 +250,29 @@ void configure_gop() {
 		}
 
 		printf("Switched to video mode %d\n", best_mode);
+		current_mode = best_mode;
+
 	} else {
 		printf("No need to switch the video mode\n");
 	}
 
+	status = gop->QueryMode(gop, current_mode, &mode_info_size, &mode_info);
+
+	if (EFI_ERROR(status)) {
+		printf("Unable to get the current video mode %d\n", current_mode);
+		exit(1);
+	}
+
+	information->framebuffer_physical_address = gop->Mode->FrameBufferBase;
+	information->horizontal_stride = mode_info->PixelsPerScanLine * sizeof(uint32_t);
+	information->width = mode_info->HorizontalResolution;
+	information->height = mode_info->VerticalResolution;
+
 	// Log where the framebuffer is located
-	printf("Framebuffer physical address: 0x%x\n", gop->Mode->FrameBufferBase);
-	printf("Framebuffer physical size: 0x%x\n", gop->Mode->FrameBufferSize);
+	printf("Framebuffer physical address: 0x%x\n", information->framebuffer_physical_address);
+	printf("Framebuffer horizontal stride: 0x%x\n", information->horizontal_stride);
+	printf("Framebuffer width: 0x%x\n", information->width);
+	printf("Framebuffer height: 0x%x\n", information->height);
 }
 
 void load_file(const char* path, uint8_t** data, uint64_t* size) {
@@ -285,7 +312,7 @@ int main(int argument_count, char** arguments) {
 	struct UefiData data;
 	data.system_table = ST;
 
-	configure_gop();
+	configure_gop(&data.graphics_information);
 
 	printf("Getting ready for kernel...\n");
 	printf("Kernel loader: 0x%x\n", (uint64_t)&enter_kernel);
