@@ -1,5 +1,6 @@
 #include <uefi.h>
 
+const int verbose = 0;
 const int switch_video_mode = 0;
 
 struct MemoryMap {
@@ -66,6 +67,8 @@ const char* memory_map_types[] = {
 };
 
 void print_memory_map(struct MemoryMap map) {
+	if (!verbose) return;
+
 	printf("Memory map:\n");
 	printf("Address              Size Type\n");
 
@@ -162,6 +165,11 @@ void add_memory_info(struct UefiData* data, struct MemoryMap* map) {
 		data->regions[current_region++] = (struct Segment) { .start = start, .end = end, .type = type };
 	}
 
+	// Set the first region to be reserved
+	if (current_region > 0) {
+		data->regions[0].type = REGION_RESERVED;
+	}
+
 	printf("Physical memory size: %d MiB\n", data->physical_memory_size / (0x100000));
 	printf("Memory map end: %d MiB\n", data->memory_map_end / (0x100000));
 }
@@ -214,13 +222,15 @@ void configure_gop(struct GraphicsInformation* information) {
 		int64_t width = mode_info->HorizontalResolution;
 		int64_t height = mode_info->VerticalResolution;
 
-		printf("Mode %d: width=%d, height=%d, format=%x %s\n",
-			i,
-			width,
-			height,
-			mode_info->PixelFormat,
-			i == current_mode ? "(current)" : ""
-		);
+		if (verbose) {
+			printf("Mode %d: width=%d, height=%d, format=%x %s\n",
+				i,
+				width,
+				height,
+				mode_info->PixelFormat,
+				i == current_mode ? "(current)" : ""
+			);
+		}
 
 		// Calculate the area of the current mode
 		int64_t area = width * height;
@@ -342,6 +352,7 @@ int main(int argument_count, char** arguments) {
 	printf("Entry point: 0x%x\n", (uint64_t)information.entry_point);
 	printf("All done\n");
 
+	exit_bs();
 	enter_kernel(information.entry_point, &data);
 	while (1) {}
 	return 0;

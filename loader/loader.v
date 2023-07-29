@@ -58,7 +58,8 @@ find_region(available_regions: Segment*, available_region_count: u64, size: u64)
 	if size % PAGE_SIZE != 0 return ERROR_INVALID_DATA
 
 	# Find a region of memory that is large enough to hold the image
-	loop (i = 0, i < available_region_count, i++) {
+	# Note: Skip the first one, because we do not want address 0x0 (this could break if the memory layout is very weird)
+	loop (i = 1, i < available_region_count, i++) {
 		region = available_regions[i]
 
 		# Verify the region is large enough

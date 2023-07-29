@@ -6,8 +6,8 @@ enter_kernel:
 cli
 
 # Save the kernel entry point and uefi data
-mov qword ptr [kernel_entry_point], rcx
-mov qword ptr [uefi_information], rdx
+mov qword ptr [rip+kernel_entry_point], rcx
+mov qword ptr [rip+uefi_information], rdx
 
 # Enable: fxsave, fxrstor, unmasked simd floating point exceptions
 mov rax, cr4
@@ -20,12 +20,12 @@ mov cr4, rax
 mov rsi, cr3
 
 # Copy the entries to the new kernel paging table
-lea rdi, [kernel_paging_table]
+lea rdi, [rip+kernel_paging_table]
 mov rcx, 0x1000
 rep movsb
 
 # Map the last entry to the first
-lea rdi, [kernel_paging_table]
+lea rdi, [rip+kernel_paging_table]
 mov rax, qword ptr [rdi]
 mov qword ptr [rdi+(0x100*8)], rax
 
@@ -38,25 +38,25 @@ mov cr3, rdi
 mov rax, 0xffff800000000000
 
 # Use kernel mapping in TSS RSPs and ISTs
-add qword ptr [tss64_rsp0], rax
-add qword ptr [tss64_ist1], rax
+add qword ptr [rip+tss64_rsp0], rax
+add qword ptr [rip+tss64_ist1], rax
 
 # Insert address of TSS into GDT before loading it
-lea rcx, [tss64]
+lea rcx, [rip+tss64]
 add rcx, rax
-mov word ptr [gdt64_tss_address_0], cx
+mov word ptr [rip+gdt64_tss_address_0], cx
 shr rcx, 16
-mov byte ptr [gdt64_tss_address_1], cl
+mov byte ptr [rip+gdt64_tss_address_1], cl
 shr rcx, 8
-mov byte ptr [gdt64_tss_address_2], cl
+mov byte ptr [rip+gdt64_tss_address_2], cl
 shr rcx, 8
-mov dword ptr [gdt64_tss_address_3], ecx
+mov dword ptr [rip+gdt64_tss_address_3], ecx
 
 # Use kernel mapping with GDTR
-add qword ptr [gdtr64_address], rax
+add qword ptr [rip+gdtr64_address], rax
 
 # Load the 64-bit global descriptor table
-lgdt [gdtr64]
+lgdt [rip+gdtr64]
 
 # Register TSS from GDT
 mov cx, 0x40
@@ -73,28 +73,28 @@ add rsp, rax
 xor rdi, rdi
 
 # Pass the interrupt tables to the kernel
-lea rsi, [interrupt_tables]
+lea rsi, [rip+interrupt_tables]
 add rsi, rax
 
 # Pass the interrupt stack pointer
-lea rdx, [interrupt_stack_start]
+lea rdx, [rip+interrupt_stack_start]
 add rdx, rax
 
 # Pass the physical address of GDTR
-lea rcx, [gdtr64]
+lea rcx, [rip+gdtr64]
 
 # Pass the uefi data
 mov r8, rsi
 
 push rdi # Push zero padding
-push qword ptr [uefi_information]
+push qword ptr [rip+uefi_information]
 push rcx
 push rdx
 push rsi
 push rdi
 
 # Jump to the kernel using the kernel mapping
-add rax, qword ptr [kernel_entry_point]
+add rax, qword ptr [rip+kernel_entry_point]
 jmp rax
 
 .section .data
@@ -102,7 +102,7 @@ jmp rax
 kernel_entry_point: .quad 0
 uefi_information: .quad 0 
 
-.align 8
+.align 16
 gdt64_start:
 
 # Null descriptor
@@ -184,7 +184,7 @@ gdt64_tss_address_3:
 
 gdt64_end:
 
-.align 8
+.align 16
 gdtr64:
 .word gdt64_end - gdt64_start - 1
 gdtr64_address:
@@ -192,25 +192,26 @@ gdtr64_address:
 
 # --- TSS (64-bit) ---
 
-.align 8
+.align 16
 tss64:
-.long 0 # reserved
+.long 0                     # Reserved
 tss64_rsp0:
-.quad interrupt_stack_start # rsp0
-.quad 0 # rsp1
-.quad 0 # rsp2
-.quad 0 # reserved
+.quad interrupt_stack_start # RSP0
+.quad 0                     # RSP1
+.quad 0                     # RSP2
+.quad 0                     # Reserved
 tss64_ist1:
-.quad interrupt_stack_start # ist1
-.quad 0 # ist2
-.quad 0 # ist3
-.quad 0 # ist4
-.quad 0 # ist5
-.quad 0 # ist6
-.quad 0 # ist7
-.quad 0 # reserved
-.word 0 # reserved
-.word 104 # iopb
+.quad interrupt_stack_start # IST1
+.quad 0                     # IST2
+.quad 0                     # IST3
+.quad 0                     # IST4
+.quad 0                     # IST5
+.quad 0                     # IST6
+.quad 0                     # IST7
+.quad 0                     # Reserved
+.word 0                     # Reserved
+.word 0x68                  # IO permission map (point to the end of this structure)
+.zero 0x1000
 
 # --- Configuration ---
 
