@@ -86,6 +86,9 @@ lea rcx, [rip+gdtr64]
 # Pass the uefi data
 mov r8, rsi
 
+# Remap uefi data
+add qword ptr [rip+uefi_information], rax
+
 push rdi # Push zero padding
 push qword ptr [rip+uefi_information]
 push rcx

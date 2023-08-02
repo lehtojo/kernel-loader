@@ -7,6 +7,7 @@ struct MemoryMap {
 	efi_memory_descriptor_t* descriptors;
 	uintn_t descriptor_size;
 	uintn_t size;
+	uintn_t capacity;
 };
 
 #define REGION_UNKNOWN -1
@@ -107,9 +108,11 @@ struct MemoryMap load_memory_map() {
 	}
 
 	// Allocate memory for the memory map
-	memory_map_size += 4 * descriptor_size;
+	// Note: Allocate extra as we will reuse the buffer
+	uintn_t memory_map_capacity = memory_map_size + max(memory_map_size, descriptor_size * 10);
+	memory_map_size = memory_map_capacity;
 
-	efi_memory_descriptor_t* descriptors = (efi_memory_descriptor_t*)malloc(memory_map_size);
+	efi_memory_descriptor_t* descriptors = (efi_memory_descriptor_t*)malloc(memory_map_capacity);
 
 	if (!descriptors) {
 		printf("Failed to allocate memory for memory map\n");
@@ -124,7 +127,7 @@ struct MemoryMap load_memory_map() {
 		exit(1);
 	}
 
-	return (struct MemoryMap) { .descriptors = descriptors, .descriptor_size = descriptor_size, .size = memory_map_size };
+	return (struct MemoryMap) { .descriptors = descriptors, .descriptor_size = descriptor_size, .size = memory_map_size, .capacity = memory_map_capacity };
 }
 
 void add_memory_info(struct UefiData* data, struct MemoryMap* map) {
