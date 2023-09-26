@@ -165,8 +165,7 @@ export load(data: link, available_regions: Segment*, available_region_count: u64
 	if header.magic_number != ELF_MAGIC_NUMBER or 
 		header.class != ELF_CLASS_64_BIT or 
 		header.endianness != ELF_LITTLE_ENDIAN or 
-		header.machine != ELF_MACHINE_TYPE_X64 or 
-		header.type != ELF_OBJECT_FILE_TYPE_DYNAMIC {
+		header.machine != ELF_MACHINE_TYPE_X64 {
 		return ERROR_UNSUPPORTED
 	}
 
