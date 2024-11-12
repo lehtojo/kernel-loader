@@ -1,4 +1,7 @@
-# Kernel
+# Kernel Loader
+UEFI Kernel Loader for the [kernel](https://github.com/lehtojo/kernel) project.
+
+https://github.com/user-attachments/assets/d04955b1-2482-474e-866f-be7b69e06d06
 
 ## Getting started
 1. Install the following dependencies:
